@@ -1,0 +1,39 @@
+// growth_solver.vfl
+float get_light_influence(vector pos) {
+    float height = pos.y;
+    float light = fit(height, 0, 10, 0.5, 1.0);
+    float noise_val = noise(pos * chf("light_noise_freq"));
+    return light * (1.0 + noise_val * 0.2);
+}
+
+float get_space_influence(vector pos) {
+    int nearby[] = nearpoints(0, pos, chf("space_check_radius"));
+    float crowd_factor = float(len(nearby)) / chf("max_neighbors");
+    return 1.0 - clamp(crowd_factor, 0, 1);
+}
+
+vector compute_growth_direction(int ptnum; vector current_dir) {
+    vector pos = point(0, "P", ptnum);
+    float light = get_light_influence(pos);
+    float space = get_space_influence(pos);
+    vector up = {0,1,0};
+    vector light_dir = lerp(current_dir, up, light * chf("light_influence"));
+    vector noise_offset = curlnoise(pos * chf("noise_freq") + chf("time"));
+    vector final_dir = normalize(light_dir + noise_offset * chf("noise_amount") * space);
+    return final_dir;
+}
+
+// Main execution
+int ptnum = @ptnum;
+vector pos = v@P;
+vector current_dir = normalize(v@N);
+
+vector growth_dir = compute_growth_direction(ptnum, current_dir);
+float growth_amount = chf("growth_rate") * 
+                     get_light_influence(pos) * 
+                     get_space_influence(pos);
+
+// Update point attributes
+v@P += growth_dir * growth_amount;
+f@growth_age += growth_amount;
+v@Cd = chramp("age_colors", f@growth_age);
